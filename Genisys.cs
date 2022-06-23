@@ -1,21 +1,91 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 using System.Timers;
+using PCLCP.Util;
 
 namespace Genisys
 {
     public class Genisys
     {
-        public enum Mode { Slave = 0, Master = 1 };
+        private Timer _pollTimer;
+        private Timer _recallTimer;
+
+        public enum Modes
+        {
+            Slave, Master
+        }
+
+        public enum ByteTypes
+        {
+            Escape = 0xf0,
+            Ack_Master = 0xf1,
+            Indicaiton = 0xf2,
+            Control_Checkback = 0xf3,
+            // 0xf4, 0xf5, 0xf7 undefined
+            End_Of_Message = 0xf6,
+            Date_Time_Update = 0xf8,
+            Common_Control = 0xf9,
+            Ack_Slave = 0xfa,
+            Poll = 0xfb,
+            Control = 0xfc,
+            Recall = 0xfd,
+            Execute = 0xfe,
+            Illegal = 0xff
+        }
 
         public Genisys()
         {
+            // Genisys protocol supports up to 256 bytes of controls and indications, or 2048 bits
+            // Bytes 224 - 255 (0xE0 - 0xFF) are reserved for status type information.
+            BitVector controls = new BitVector(2048);
+            BitVector indications = new BitVector(2048);
 
+            _pollTimer = new Timer();
+            _pollTimer.Interval = PollTime;
+            _pollTimer.Elapsed += onPoll;
+
+            _recallTimer = new Timer();
+            _recallTimer.Interval = RecallTime;
+            _recallTimer.Elapsed += onRecall;
+        }
+
+        public void Start()
+        {
+            _pollTimer.Enabled = true;
+            _recallTimer.Enabled = true;
+        }
+
+        public void Stop()
+        {
+            _pollTimer.Enabled = false;
+            _recallTimer.Enabled = false;
+        }
+
+        public uint PollTime
+        {
+            get;
+            set;
+        }
+
+        public uint RecallTime
+        {
+            get;
+            set;
+        }
+
+        private void onPoll(Object sender, ElapsedEventArgs e)
+        {
+
+        }
+
+        private void onRecall(Object sender, ElapsedEventArgs e)
+        {
 
         }
 
@@ -27,23 +97,14 @@ namespace Genisys
 
     public class Connection
     {
-        /*
-         * Eventually support both network and serial connections 
-         */
-        public Controls controls;
-        public Indications indications;
         private IPEndPoint address;
-        private Timer pollTimer;
+        
         private UDPSocket socket;
 
         public Connection(string address, int port)
         {
             this.address = new IPEndPoint(IPAddress.Parse(address), port);
-            pollTimer = new Timer();
-            pollTimer.Interval = 1000;
-            pollTimer.Elapsed += onPoll;
-            controls = new Controls(this);
-            indications = new Indications(this);
+
 
             socket = new UDPSocket();
             socket.Client(this.address);
@@ -55,55 +116,7 @@ namespace Genisys
             //throw new NotImplementedException();
         }
 
-        public void Start()
-        {
-            pollTimer.Enabled = true;
-        }
 
-        public void Stop()
-        {
-            pollTimer.Enabled = false;
-        }
-    }
-
-    public class Controls
-    {
-        private bool[] localArray = new bool[65535];
-        Connection conn;
-
-        public Controls(Connection conn)
-        {
-            this.conn = conn;
-        }
-
-        public bool this[int x]
-        {
-            get { return this.localArray[x]; }
-            set
-            {
-                this.localArray[x] = value;
-            }
-        }
-    }
-
-    public class Indications
-    {
-        private bool[] localArray = new bool[65535];
-        Connection conn;
-
-        public Indications(Connection conn)
-        {
-            this.conn = conn;
-        }
-
-        public bool this[int x]
-        {
-            get { return this.localArray[x]; }
-            set
-            {
-                this.localArray[x] = value;
-            }
-        }
     }
 
     public class UDPSocket
